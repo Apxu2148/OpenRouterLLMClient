@@ -1,0 +1,19 @@
+default_model: deepseek/deepseek-chat
+
+request_defaults:
+  temperature: 0.7
+  max_tokens: 2000
+  stream: false
+
+model_presets:
+  deepseek_chat:
+    model: deepseek/deepseek-chat
+    description: Default general-purpose DeepSeek chat model
+
+  deepseek_r1:
+    model: deepseek/deepseek-r1
+    description: DeepSeek reasoning model, if available in the user's OpenRouter account
+
+  free_router:
+    model: openrouter/free
+    description: OpenRouter free model router for simple tests, if available
