@@ -72,7 +72,13 @@ Type /help for commands.
 /use <model_id>    Switch the current model.
 /models            List available OpenRouter models.
 /models <filter>   List models matching id or name.
-/exit, /quit       Exit the program.
+/web               Show web search status.
+/web on            Enable web search for normal messages.
+/web off           Disable web search for normal messages.
+/web status        Show web search status.
+/askweb <question> Send one question with web search.
+/exit              Exit the program.
+/quit              Exit the program.
 ```
 
 Example model switch:
@@ -86,6 +92,24 @@ Example test request:
 ```text
 Hello, summarize what OpenRouter is in one sentence.
 ```
+
+## Web Search Mode
+
+Web search is off by default. Enable it for later normal messages with:
+
+```text
+/web on
+```
+
+Turn it off with:
+
+```text
+/web off
+```
+
+Check the current state with `/web` or `/web status`. Use `/askweb <question>` for a one-shot web-search request without changing the current web mode.
+
+Web search may cost more than a normal request because search requests can have their own cost and found context can add input tokens. See `DEVELOPER_GUIDE.md` for implementation and reuse details.
 
 ## Tests
 
@@ -107,6 +131,8 @@ logs/errors.jsonl
 ```
 
 Only short sanitized previews are logged. API keys and likely secret values are masked. The `.gitignore` excludes real logs and `.env`, while `logs/.gitkeep` keeps the folder in the project.
+
+Chat and error log rows include `web_search: true` or `web_search: false`.
 
 ## Limits
 

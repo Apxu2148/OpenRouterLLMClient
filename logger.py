@@ -61,12 +61,14 @@ def log_chat(
     user_message: str,
     assistant_response: str,
     success: bool,
+    web_search: bool = False,
 ) -> None:
     _append_jsonl(
         CHAT_LOG_FILE,
         {
             "timestamp": utc_timestamp(),
             "model": sanitize_text(model),
+            "web_search": web_search,
             "user_message_preview": preview_text(user_message),
             "assistant_response_preview": preview_text(assistant_response),
             "success": success,
@@ -74,7 +76,7 @@ def log_chat(
     )
 
 
-def log_error(model: str, error: BaseException | str) -> None:
+def log_error(model: str, error: BaseException | str, web_search: bool = False) -> None:
     error_type = type(error).__name__ if isinstance(error, BaseException) else "Error"
     error_message = str(error)
     _append_jsonl(
@@ -82,6 +84,7 @@ def log_error(model: str, error: BaseException | str) -> None:
         {
             "timestamp": utc_timestamp(),
             "model": sanitize_text(model),
+            "web_search": web_search,
             "error_type": sanitize_text(error_type),
             "error_message": preview_text(error_message),
         },

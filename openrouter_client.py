@@ -4,7 +4,12 @@ from typing import Any
 
 from openai import APIConnectionError, APIError, AuthenticationError, OpenAI
 
-from config import AppConfig, OPENROUTER_BASE_URL, is_missing_api_key
+from config import (
+    AppConfig,
+    DEFAULT_WEB_SEARCH_TOOL_TYPE,
+    OPENROUTER_BASE_URL,
+    is_missing_api_key,
+)
 from logger import sanitize_text
 from models import ModelInfo
 
@@ -35,13 +40,17 @@ class OpenRouterLLMClient:
             api_key=config.api_key,
         )
 
-    def chat(self, model: str, user_message: str) -> str:
+    def chat(self, model: str, user_message: str, use_web_search: bool = False) -> str:
         try:
             response = self._client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": user_message}],
-                extra_headers=self._extra_headers(),
-                **self._request_defaults(),
+                **build_chat_kwargs(
+                    model=model,
+                    user_message=user_message,
+                    request_defaults=self.config.request_defaults,
+                    extra_headers=self._extra_headers(),
+                    use_web_search=use_web_search,
+                    web_search_tool_type=self.config.web_search.tool_type,
+                ),
             )
         except AuthenticationError as exc:
             raise OpenRouterClientError("Authentication failed. Check your OpenRouter API key.") from exc
@@ -87,12 +96,6 @@ class OpenRouterLLMClient:
         ]
         return [model for model in model_infos if model.matches(text_filter)]
 
-    def _request_defaults(self) -> dict[str, Any]:
-        defaults = dict(self.config.request_defaults)
-        defaults.pop("stream", None)
-        defaults["stream"] = False
-        return defaults
-
     def _extra_headers(self) -> dict[str, str]:
         headers: dict[str, str] = {}
         if self.config.http_referer:
@@ -100,3 +103,25 @@ class OpenRouterLLMClient:
         if self.config.app_title:
             headers["X-Title"] = self.config.app_title
         return headers
+
+
+def build_chat_kwargs(
+    model: str,
+    user_message: str,
+    request_defaults: dict[str, Any],
+    extra_headers: dict[str, str] | None = None,
+    use_web_search: bool = False,
+    web_search_tool_type: str = DEFAULT_WEB_SEARCH_TOOL_TYPE,
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = dict(request_defaults)
+    kwargs.pop("stream", None)
+    kwargs.pop("tools", None)
+    kwargs["stream"] = False
+    kwargs["model"] = model
+    kwargs["messages"] = [{"role": "user", "content": user_message}]
+    kwargs["extra_headers"] = extra_headers or {}
+
+    if use_web_search:
+        kwargs["tools"] = [{"type": web_search_tool_type}]
+
+    return kwargs

@@ -5,6 +5,10 @@ request_defaults:
   max_tokens: 2000
   stream: false
 
+web_search:
+  enabled_by_default: false
+  tool_type: openrouter:web_search
+
 model_presets:
   deepseek_chat:
     model: deepseek/deepseek-chat

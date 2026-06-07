@@ -13,6 +13,8 @@ def test_config_loads_default_model(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.default_model == "deepseek/deepseek-chat"
     assert config.request_defaults["temperature"] == 0.7
     assert config.request_defaults["max_tokens"] == 2000
+    assert config.web_search.enabled_by_default is False
+    assert config.web_search.tool_type == "openrouter:web_search"
 
 
 def test_empty_api_key_is_missing() -> None:
