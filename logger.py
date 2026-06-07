@@ -62,33 +62,50 @@ def log_chat(
     assistant_response: str,
     success: bool,
     web_search: bool = False,
+    cancelled: bool = False,
+    timeout: bool = False,
 ) -> None:
-    _append_jsonl(
-        CHAT_LOG_FILE,
-        {
-            "timestamp": utc_timestamp(),
-            "model": sanitize_text(model),
-            "web_search": web_search,
-            "user_message_preview": preview_text(user_message),
-            "assistant_response_preview": preview_text(assistant_response),
-            "success": success,
-        },
-    )
+    payload = {
+        "timestamp": utc_timestamp(),
+        "model": sanitize_text(model),
+        "web_search": web_search,
+        "user_message_preview": preview_text(user_message),
+        "assistant_response_preview": preview_text(assistant_response),
+        "success": success,
+    }
+    if cancelled:
+        payload["cancelled"] = True
+    if timeout:
+        payload["timeout"] = True
+
+    _append_jsonl(CHAT_LOG_FILE, payload)
 
 
-def log_error(model: str, error: BaseException | str, web_search: bool = False) -> None:
+def log_error(
+    model: str,
+    error: BaseException | str,
+    web_search: bool = False,
+    user_message: str | None = None,
+    cancelled: bool = False,
+    timeout: bool = False,
+) -> None:
     error_type = type(error).__name__ if isinstance(error, BaseException) else "Error"
     error_message = str(error)
-    _append_jsonl(
-        ERROR_LOG_FILE,
-        {
-            "timestamp": utc_timestamp(),
-            "model": sanitize_text(model),
-            "web_search": web_search,
-            "error_type": sanitize_text(error_type),
-            "error_message": preview_text(error_message),
-        },
-    )
+    payload = {
+        "timestamp": utc_timestamp(),
+        "model": sanitize_text(model),
+        "web_search": web_search,
+        "error_type": sanitize_text(error_type),
+        "error_message": preview_text(error_message),
+    }
+    if user_message is not None:
+        payload["user_message_preview"] = preview_text(user_message)
+    if cancelled:
+        payload["cancelled"] = True
+    if timeout:
+        payload["timeout"] = True
+
+    _append_jsonl(ERROR_LOG_FILE, payload)
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:

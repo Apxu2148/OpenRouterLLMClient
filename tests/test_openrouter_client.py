@@ -10,13 +10,17 @@ def test_build_chat_kwargs_omits_tools_without_web_search() -> None:
             "max_tokens": 100,
             "stream": True,
             "tools": [{"type": "should-not-leak"}],
+            "timeout_seconds": 999,
         },
         extra_headers={"X-Title": "OpenRouterLLMClient"},
         use_web_search=False,
+        timeout_seconds=30,
     )
 
     assert "tools" not in kwargs
+    assert "timeout_seconds" not in kwargs
     assert kwargs["stream"] is False
+    assert kwargs["timeout"] == 30
     assert kwargs["model"] == "deepseek/deepseek-chat"
     assert kwargs["messages"] == [{"role": "user", "content": "hello"}]
     assert kwargs["extra_headers"] == {"X-Title": "OpenRouterLLMClient"}
@@ -31,3 +35,4 @@ def test_build_chat_kwargs_adds_web_search_server_tool() -> None:
     )
 
     assert kwargs["tools"] == [{"type": "openrouter:web_search"}]
+    assert kwargs["timeout"] == 120.0

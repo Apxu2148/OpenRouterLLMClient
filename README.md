@@ -72,6 +72,8 @@ Type /help for commands.
 /use <model_id>    Switch the current model.
 /models            List available OpenRouter models.
 /models <filter>   List models matching id or name.
+/timeout           Show the current request timeout.
+/timeout <seconds> Set local wait timeout for later API calls.
 /web               Show web search status.
 /web on            Enable web search for normal messages.
 /web off           Disable web search for normal messages.
@@ -111,6 +113,14 @@ Check the current state with `/web` or `/web status`. Use `/askweb <question>` f
 
 Web search may cost more than a normal request because search requests can have their own cost and found context can add input tokens. See `DEVELOPER_GUIDE.md` for implementation and reuse details.
 
+## Timeout And Interrupts
+
+The default request timeout is 120 seconds. Use `/timeout` to show the current value, or `/timeout <seconds>` to set a positive local application-level timeout for waiting on later model responses.
+
+When the timeout fires, the CLI stops waiting, logs `timeout: true`, and returns to the prompt. The timeout returns control to the local CLI; it does not guarantee cancellation of provider-side processing or billing.
+
+While waiting for a model response, press Ctrl+C to stop local waiting and return to the prompt. Local cancellation has the same provider-side limitation.
+
 ## Tests
 
 After dependencies are installed:
@@ -132,7 +142,7 @@ logs/errors.jsonl
 
 Only short sanitized previews are logged. API keys and likely secret values are masked. The `.gitignore` excludes real logs and `.env`, while `logs/.gitkeep` keeps the folder in the project.
 
-Chat and error log rows include `web_search: true` or `web_search: false`.
+Chat and error log rows include `web_search: true` or `web_search: false`. Cancelled and timed-out requests are logged with matching flags.
 
 ## Limits
 

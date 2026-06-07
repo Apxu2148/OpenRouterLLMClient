@@ -482,3 +482,110 @@ Future reuse:
 - In EidosAgent, the OpenRouter backend should accept a per-request web-search flag from the LLM router.
 - EidosAgent should not make all requests web-enabled by default; route only tasks that need fresh external information through `use_web_search=True`.
 - Future projects should keep the same safety rule: never log full API keys, full search context, or large external result dumps.
+
+17. Application-level timeout and local cancellation
+
+OpenRouterLLMClient applies a configurable local wait timeout around model calls and handles local interruption while waiting for a model response.
+The SDK/http timeout is still passed to the OpenAI-compatible client, but the user-facing guarantee comes from an application-level wrapper in `main.py`.
+
+Configuration:
+
+```yaml
+request_defaults:
+  temperature: 0.7
+  max_tokens: 2000
+  stream: false
+  timeout_seconds: 120
+```
+
+`config.py` parses `request_defaults.timeout_seconds` into `AppConfig.request_timeout_seconds`.
+The parsed value must be a positive number.
+`timeout_seconds` is removed from `request_defaults` before those defaults are used as API payload defaults, so it is not sent as an unsupported chat parameter.
+
+Why SDK timeout alone is not enough:
+
+- The OpenAI SDK `timeout` can behave like a transport timeout for connect/read/write operations.
+- A long generation can keep the connection active and still run longer than the value the user set with `/timeout`.
+- The CLI needs a wall-clock limit for how long the REPL waits before returning control to the user.
+
+OpenRouter client behavior:
+
+- `OpenRouterLLMClient.chat(..., timeout_seconds=...)` accepts a per-request timeout override.
+- `OpenRouterLLMClient.list_models(..., timeout_seconds=...)` also accepts a timeout override.
+- `openrouter_client.build_chat_kwargs(...)` still converts the runtime value into the OpenAI SDK `timeout` request option as a transport guard.
+- The timeout applies to normal chat and web-search chat because both paths use the same chat helper.
+- SDK timeout errors are converted into `OpenRouterTimeoutError`.
+
+Application-level wrapper:
+
+- `main.run_with_application_timeout(...)` runs the blocking model call in a daemon thread.
+- The main REPL thread waits on a result queue until the configured wall-clock deadline.
+- If the call returns before the deadline, its result or exception is propagated normally.
+- If the deadline passes first, `ApplicationTimeout` is raised in the REPL thread.
+- On timeout, the daemon worker may continue in the background until the underlying SDK/http call returns.
+- The daemon worker is intentionally daemonized so a timed-out request does not prevent `/quit` or process exit.
+- Ctrl+C while waiting is still handled by the REPL thread and returns to the prompt without a traceback.
+
+REPL behavior:
+
+```text
+/timeout
+Current request timeout: 120 seconds
+
+/timeout 30
+Request timeout set to 30 seconds
+```
+
+Invalid values such as `/timeout abc`, `/timeout -5`, and `/timeout 0` print:
+
+```text
+Invalid timeout. Please provide a positive number of seconds.
+```
+
+The invalid input does not exit the REPL and does not change the current timeout.
+The timeout setting applies to later chat, `/askweb`, and `/models` API calls in the current REPL session.
+
+Ctrl+C handling:
+
+- Ctrl+C at the input prompt still exits the client.
+- Ctrl+C while waiting for a model response is handled by `send_chat_message(...)`.
+- The client prints `Request interrupted by user. Returned to prompt.`
+- The client also prints `Note: provider-side processing may already have started.`
+- The REPL returns to the prompt without printing a traceback.
+
+Timeout handling:
+
+- When the application-level timeout fires, the client prints `Request timed out after N seconds. Returned to prompt.`
+- The client also prints `Note: provider-side processing may already have started.`
+- When the SDK reports a timeout first, the client still handles it without a traceback.
+- The REPL returns to the prompt without a traceback.
+- The same handling is used for normal requests and web-search requests.
+
+Logging:
+
+- `logger.log_error(...)` accepts `user_message`, `cancelled`, and `timeout` fields.
+- `logger.log_chat(...)` accepts `cancelled` and `timeout` fields for failed chat rows.
+- Cancelled requests are logged with `cancelled: true`.
+- Timed-out requests are logged with `timeout: true`.
+- Application-level timeout error rows use `error_type: "ApplicationTimeout"`.
+- User prompts are stored only as sanitized previews.
+- API keys, full prompts, full web-search context, and large external result dumps must not be logged.
+
+Cancellation limitations:
+
+- Cancellation is local only.
+- Application-level timeout is also local only.
+- OpenRouter or the upstream provider may continue processing after the client stops waiting.
+- Billing may already have started.
+- Exact cancellation behavior can depend on the OpenAI SDK and HTTP transport.
+- Server tools and web search can still be slower than normal requests.
+- A timed-out background request may finish later, but its result is ignored by the CLI.
+- Based on manual testing notes, `deepseek/deepseek-r1` with web search is currently not recommended.
+
+Future reuse:
+
+- Future projects should treat cancellation as local control-flow interruption.
+- Future projects should treat application-level timeout as local control-flow interruption too.
+- EidosAgent must not assume that OpenRouter or the provider cancelled remote generation or billing.
+- EidosAgent should pass timeout and cancellation state through its LLM router/backend boundary explicitly.
+- Reuse `OpenRouterLLMClient.chat(..., timeout_seconds=..., use_web_search=...)` instead of duplicating request construction.

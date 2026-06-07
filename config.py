@@ -15,6 +15,7 @@ MODELS_CONFIG_FILE = PROJECT_ROOT / "config" / "models_config.yaml"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_PREVIEW_LIMIT = 300
 DEFAULT_WEB_SEARCH_TOOL_TYPE = "openrouter:web_search"
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 120.0
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class AppConfig:
     http_referer: str | None
     app_title: str | None
     default_model: str
+    request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS
     request_defaults: dict[str, Any] = field(default_factory=dict)
     model_presets: dict[str, dict[str, str]] = field(default_factory=dict)
     web_search: WebSearchConfig = field(default_factory=WebSearchConfig)
@@ -65,6 +67,11 @@ def load_config(
     request_defaults = models_config.get("request_defaults") or {}
     if not isinstance(request_defaults, dict):
         raise ValueError("request_defaults must be a YAML object.")
+    request_defaults = dict(request_defaults)
+    request_timeout_seconds = _parse_positive_seconds(
+        request_defaults.pop("timeout_seconds", DEFAULT_REQUEST_TIMEOUT_SECONDS),
+        "request_defaults.timeout_seconds",
+    )
 
     model_presets = models_config.get("model_presets") or {}
     if not isinstance(model_presets, dict):
@@ -77,6 +84,7 @@ def load_config(
         http_referer=os.getenv("OPENROUTER_HTTP_REFERER"),
         app_title=os.getenv("OPENROUTER_APP_TITLE"),
         default_model=default_model,
+        request_timeout_seconds=request_timeout_seconds,
         request_defaults=request_defaults,
         model_presets=model_presets,
         web_search=web_search,
@@ -99,3 +107,15 @@ def _parse_web_search_config(raw_config: object) -> WebSearchConfig:
         enabled_by_default=enabled_by_default,
         tool_type=tool_type,
     )
+
+
+def _parse_positive_seconds(value: object, field_name: str) -> float:
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be a positive number of seconds.") from exc
+
+    if seconds <= 0:
+        raise ValueError(f"{field_name} must be a positive number of seconds.")
+
+    return seconds

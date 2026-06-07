@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from openai import APIConnectionError, APIError, AuthenticationError, OpenAI
+from openai import APIConnectionError, APIError, APITimeoutError, AuthenticationError, OpenAI
 
 from config import (
     AppConfig,
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
     DEFAULT_WEB_SEARCH_TOOL_TYPE,
     OPENROUTER_BASE_URL,
     is_missing_api_key,
@@ -26,6 +27,10 @@ class EmptyResponseError(OpenRouterClientError):
     pass
 
 
+class OpenRouterTimeoutError(OpenRouterClientError):
+    pass
+
+
 class OpenRouterLLMClient:
     def __init__(self, config: AppConfig) -> None:
         if is_missing_api_key(config.api_key):
@@ -40,7 +45,13 @@ class OpenRouterLLMClient:
             api_key=config.api_key,
         )
 
-    def chat(self, model: str, user_message: str, use_web_search: bool = False) -> str:
+    def chat(
+        self,
+        model: str,
+        user_message: str,
+        use_web_search: bool = False,
+        timeout_seconds: float | None = None,
+    ) -> str:
         try:
             response = self._client.chat.completions.create(
                 **build_chat_kwargs(
@@ -50,10 +61,13 @@ class OpenRouterLLMClient:
                     extra_headers=self._extra_headers(),
                     use_web_search=use_web_search,
                     web_search_tool_type=self.config.web_search.tool_type,
+                    timeout_seconds=timeout_seconds or self.config.request_timeout_seconds,
                 ),
             )
         except AuthenticationError as exc:
             raise OpenRouterClientError("Authentication failed. Check your OpenRouter API key.") from exc
+        except APITimeoutError as exc:
+            raise OpenRouterTimeoutError("Request timed out. Returned to prompt.") from exc
         except APIConnectionError as exc:
             raise OpenRouterClientError("Network error. Check your internet connection.") from exc
         except APIError as exc:
@@ -76,11 +90,20 @@ class OpenRouterLLMClient:
 
         return text
 
-    def list_models(self, text_filter: str | None = None) -> list[ModelInfo]:
+    def list_models(
+        self,
+        text_filter: str | None = None,
+        timeout_seconds: float | None = None,
+    ) -> list[ModelInfo]:
         try:
-            models_response = self._client.models.list(extra_headers=self._extra_headers())
+            models_response = self._client.models.list(
+                extra_headers=self._extra_headers(),
+                timeout=timeout_seconds or self.config.request_timeout_seconds,
+            )
         except AuthenticationError as exc:
             raise OpenRouterClientError("Authentication failed. Check your OpenRouter API key.") from exc
+        except APITimeoutError as exc:
+            raise OpenRouterTimeoutError("Request timed out. Returned to prompt.") from exc
         except APIConnectionError as exc:
             raise OpenRouterClientError("Network error. Check your internet connection.") from exc
         except APIError as exc:
@@ -112,10 +135,12 @@ def build_chat_kwargs(
     extra_headers: dict[str, str] | None = None,
     use_web_search: bool = False,
     web_search_tool_type: str = DEFAULT_WEB_SEARCH_TOOL_TYPE,
+    timeout_seconds: float | None = DEFAULT_REQUEST_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = dict(request_defaults)
     kwargs.pop("stream", None)
     kwargs.pop("tools", None)
+    kwargs.pop("timeout_seconds", None)
     kwargs["stream"] = False
     kwargs["model"] = model
     kwargs["messages"] = [{"role": "user", "content": user_message}]
@@ -123,5 +148,8 @@ def build_chat_kwargs(
 
     if use_web_search:
         kwargs["tools"] = [{"type": web_search_tool_type}]
+
+    if timeout_seconds is not None:
+        kwargs["timeout"] = timeout_seconds
 
     return kwargs

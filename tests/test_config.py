@@ -11,8 +11,10 @@ def test_config_loads_default_model(monkeypatch: pytest.MonkeyPatch) -> None:
     config = load_config()
 
     assert config.default_model == "deepseek/deepseek-chat"
+    assert config.request_timeout_seconds == 120.0
     assert config.request_defaults["temperature"] == 0.7
     assert config.request_defaults["max_tokens"] == 2000
+    assert "timeout_seconds" not in config.request_defaults
     assert config.web_search.enabled_by_default is False
     assert config.web_search.tool_type == "openrouter:web_search"
 
