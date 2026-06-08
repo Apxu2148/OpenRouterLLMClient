@@ -51,6 +51,8 @@ class OpenRouterLLMClient:
         user_message: str,
         use_web_search: bool = False,
         timeout_seconds: float | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         try:
             response = self._client.chat.completions.create(
@@ -62,6 +64,8 @@ class OpenRouterLLMClient:
                     use_web_search=use_web_search,
                     web_search_tool_type=self.config.web_search.tool_type,
                     timeout_seconds=timeout_seconds or self.config.request_timeout_seconds,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
                 ),
             )
         except AuthenticationError as exc:
@@ -136,6 +140,8 @@ def build_chat_kwargs(
     use_web_search: bool = False,
     web_search_tool_type: str = DEFAULT_WEB_SEARCH_TOOL_TYPE,
     timeout_seconds: float | None = DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
 ) -> dict[str, Any]:
     kwargs: dict[str, Any] = dict(request_defaults)
     kwargs.pop("stream", None)
@@ -145,6 +151,11 @@ def build_chat_kwargs(
     kwargs["model"] = model
     kwargs["messages"] = [{"role": "user", "content": user_message}]
     kwargs["extra_headers"] = extra_headers or {}
+
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
 
     if use_web_search:
         kwargs["tools"] = [{"type": web_search_tool_type}]

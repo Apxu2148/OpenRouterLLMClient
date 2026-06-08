@@ -6,6 +6,12 @@ request_defaults:
   stream: false
   timeout_seconds: 120
 
+runtime_limits:
+  max_tokens_min: 1
+  max_tokens_max: 32000
+  temperature_min: 0.0
+  temperature_max: 2.0
+
 web_search:
   enabled_by_default: false
   tool_type: openrouter:web_search

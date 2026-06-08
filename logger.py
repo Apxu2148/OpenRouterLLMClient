@@ -64,6 +64,8 @@ def log_chat(
     web_search: bool = False,
     cancelled: bool = False,
     timeout: bool = False,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
 ) -> None:
     payload = {
         "timestamp": utc_timestamp(),
@@ -73,6 +75,10 @@ def log_chat(
         "assistant_response_preview": preview_text(assistant_response),
         "success": success,
     }
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     if cancelled:
         payload["cancelled"] = True
     if timeout:
@@ -88,6 +94,8 @@ def log_error(
     user_message: str | None = None,
     cancelled: bool = False,
     timeout: bool = False,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
 ) -> None:
     error_type = type(error).__name__ if isinstance(error, BaseException) else "Error"
     error_message = str(error)
@@ -100,6 +108,10 @@ def log_error(
     }
     if user_message is not None:
         payload["user_message_preview"] = preview_text(user_message)
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     if cancelled:
         payload["cancelled"] = True
     if timeout:

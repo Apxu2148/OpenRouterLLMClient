@@ -36,3 +36,16 @@ def test_build_chat_kwargs_adds_web_search_server_tool() -> None:
 
     assert kwargs["tools"] == [{"type": "openrouter:web_search"}]
     assert kwargs["timeout"] == 120.0
+
+
+def test_build_chat_kwargs_runtime_generation_values_override_defaults() -> None:
+    kwargs = build_chat_kwargs(
+        model="deepseek/deepseek-chat",
+        user_message="hello",
+        request_defaults={"temperature": 0.7, "max_tokens": 2000},
+        temperature=0.2,
+        max_tokens=4000,
+    )
+
+    assert kwargs["temperature"] == 0.2
+    assert kwargs["max_tokens"] == 4000

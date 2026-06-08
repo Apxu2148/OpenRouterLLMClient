@@ -589,3 +589,68 @@ Future reuse:
 - EidosAgent must not assume that OpenRouter or the provider cancelled remote generation or billing.
 - EidosAgent should pass timeout and cancellation state through its LLM router/backend boundary explicitly.
 - Reuse `OpenRouterLLMClient.chat(..., timeout_seconds=..., use_web_search=...)` instead of duplicating request construction.
+
+18. Runtime generation parameters
+
+The config file provides startup values and CLI validation limits:
+
+```yaml
+request_defaults:
+  temperature: 0.7
+  max_tokens: 2000
+  stream: false
+  timeout_seconds: 120
+
+runtime_limits:
+  max_tokens_min: 1
+  max_tokens_max: 32000
+  temperature_min: 0.0
+  temperature_max: 2.0
+```
+
+`config.py` parses `request_defaults.timeout_seconds` into `AppConfig.request_timeout_seconds` and removes it from `AppConfig.request_defaults` before API payload construction.
+`config.py` also parses `runtime_limits` into `AppConfig.runtime_limits`.
+If `runtime_limits` is missing, the defaults are:
+
+```text
+max_tokens_min = 1
+max_tokens_max = 32000
+temperature_min = 0.0
+temperature_max = 2.0
+```
+
+Invalid `runtime_limits` values fail at startup with a clear configuration error.
+This keeps validation problems visible while preserving backward compatibility for configs that do not yet define the section.
+
+REPL runtime state:
+
+- `main.run_repl(...)` initializes `current_temperature` and `current_max_tokens` from `AppConfig.request_defaults`.
+- `/tokens` prints the current session `max_tokens`.
+- `/tokens <number>` validates the integer against `AppConfig.runtime_limits` and updates only the current REPL session.
+- `/temp` prints the current session `temperature`.
+- `/temp <number>` validates the number against `AppConfig.runtime_limits` and updates only the current REPL session.
+- `/params` prints the current model, temperature, max tokens, timeout, web search state, optional web search tool, and stream mode.
+- `/tokens` and `/temp` do not write back to `config/models_config.yaml`.
+
+Request flow:
+
+- Normal user messages call `send_chat_message(...)` with the current runtime temperature and max tokens.
+- Messages sent after `/web on` use the same runtime generation values with `use_web_search=True`.
+- `/askweb <question>` sends one web-enabled request and also uses the same runtime generation values.
+- `OpenRouterLLMClient.chat(...)` accepts `temperature` and `max_tokens` as per-request overrides.
+- `openrouter_client.build_chat_kwargs(...)` starts from `AppConfig.request_defaults`, removes unsupported or controlled keys, forces `stream=False`, and then writes runtime `temperature` and `max_tokens` into the payload.
+
+Logging:
+
+- `logger.log_chat(...)` and `logger.log_error(...)` accept optional `temperature` and `max_tokens`.
+- `send_chat_message(...)` passes those values for successful chat events, failed chat events, timeouts, and Ctrl+C cancellation rows.
+- Logs still store sanitized previews only.
+- API keys, full prompts, full web-search context, and large external result dumps must not be logged.
+
+Streaming:
+
+- `stream: false` currently means a non-streaming request: the client waits for the full response and prints it at once.
+- `build_chat_kwargs(...)` forces `stream=False` even if request defaults contain a different inherited value.
+- Streaming, `/stream on/off`, and partial-token display are intentionally not implemented in this stage.
+
+Future EidosAgent-style backends should treat generation parameters as runtime policy, not as permanent config mutation, unless explicit persistence is implemented.

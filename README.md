@@ -74,6 +74,11 @@ Type /help for commands.
 /models <filter>   List models matching id or name.
 /timeout           Show the current request timeout.
 /timeout <seconds> Set local wait timeout for later API calls.
+/tokens            Show current max output tokens.
+/tokens <number>   Set max output tokens for this session.
+/temp              Show current temperature.
+/temp <number>     Set temperature for this session.
+/params            Show current model and request parameters.
 /web               Show web search status.
 /web on            Enable web search for normal messages.
 /web off           Disable web search for normal messages.
@@ -94,6 +99,16 @@ Example test request:
 ```text
 Hello, summarize what OpenRouter is in one sentence.
 ```
+
+## Request Parameters
+
+The startup values for `temperature`, `max_tokens`, `stream`, and `timeout_seconds` come from `config/models_config.yaml`.
+
+Use `/tokens` and `/temp` to show the current values. Use `/tokens <number>` and `/temp <number>` to change them for the current CLI session only. Use `/params` to show the current model, temperature, max tokens, timeout, web search state, and stream mode in one place.
+
+These commands change request parameters only for the current CLI session. They do not modify `config/models_config.yaml`.
+
+`max_tokens` limits the maximum length of the model response. `temperature` controls randomness and creativity. `stream=false` means the client waits for the full response and prints it at once.
 
 ## Web Search Mode
 
@@ -142,7 +157,7 @@ logs/errors.jsonl
 
 Only short sanitized previews are logged. API keys and likely secret values are masked. The `.gitignore` excludes real logs and `.env`, while `logs/.gitkeep` keeps the folder in the project.
 
-Chat and error log rows include `web_search: true` or `web_search: false`. Cancelled and timed-out requests are logged with matching flags.
+Chat and error log rows include `web_search: true` or `web_search: false`. Chat rows also include the runtime `temperature` and `max_tokens` where applicable. Cancelled and timed-out requests are logged with matching flags.
 
 ## Limits
 
